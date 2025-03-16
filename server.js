@@ -99,10 +99,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use("/api", userRouter);
 app.use("/api/notes", noteRouter);
 
-// Root Route
-app.get("/", (req, res) => {
-  return res.status(200).json({ success: true, message: "Welcome to the server" });
-});
+
 
 // WebSocket connection
 io.on("connection", (socket) => {
@@ -115,6 +112,11 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("A user disconnected");
   });
+});
+
+// Root Route
+app.get("/", (req, res) => {
+  return res.status(200).json({ success: true, message: "Welcome to the server" });
 });
 
 // Handle 404 errors
