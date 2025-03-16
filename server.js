@@ -1,66 +1,137 @@
+// // const express = require("express");
+// // const morgan = require("morgan");
+// // const cors = require('cors')
+// // const bodyParser = require("body-parser");
+// // const createError = require("http-errors");
+// // const xssClean = require("xss-clean");
+// // const cookieParser = require("cookie-parser");
+// // const rateLimit = require("express-rate-limit");
+// // const { userRouter } = require("./routers/userRouter");
+// // const { seedRouter } = require("./routers/seedRouter");
+// // const { authRouter } = require("./routers/authRouter");
+// // const { categoryRouter } = require("./routers/categoryRouter");
+// // const { productRouter } = require("./routers/productRouter");
+// // const { orderRouter } = require("./routers/orderRouter");
+// // const { errorResponse } = require("./controllers/responseController");
+
+// // require("./config/db");
+
+
+// // // const limiter = rateLimit({
+// // //   windowMs: 15 * 60 * 1000,
+// // //   limit: 100,
+// // //   message: "Too many reqeust from this ip please try later",
+// // //   // standardHeaders: "draft-7",
+// // //   // legacyHeaders: false,
+// // // });
+
+// // const app = express();
+
+// // app.use(cookieParser());
+// // // app.use(limiter);
+// // app.use(cors())
+// // app.use(xssClean());
+// // app.use(morgan("dev"));
+// // app.use(bodyParser.json());
+// // app.use(bodyParser.urlencoded({ extended: true }));
+
+
+// // app.use("/api/seed", seedRouter);
+
+// // app.use("/api", authRouter);
+// // app.use("/api", userRouter);
+
+
+
+// // app.get("/", (req, res) => {
+// //   return res.status(201).json({success: true, message:"welcome to the server"});
+// // });
+
+
+// // //client error handling
+
+// // app.use((req, res, next) => {
+// //   next(createError(404, "route not found"));
+// // });
+
+// // //server error handling
+
+// // app.use((err, req, res, next) => {
+// //   return errorResponse(res, { statusCode: err.status, message: err.message });
+// // });
+
+// // module.exports = app;
+
 // const express = require("express");
+// const http = require("http");
+// const { Server } = require("socket.io");
 // const morgan = require("morgan");
-// const cors = require('cors')
+// const cors = require("cors");
 // const bodyParser = require("body-parser");
 // const createError = require("http-errors");
 // const xssClean = require("xss-clean");
 // const cookieParser = require("cookie-parser");
-// const rateLimit = require("express-rate-limit");
 // const { userRouter } = require("./routers/userRouter");
-// const { seedRouter } = require("./routers/seedRouter");
-// const { authRouter } = require("./routers/authRouter");
-// const { categoryRouter } = require("./routers/categoryRouter");
-// const { productRouter } = require("./routers/productRouter");
-// const { orderRouter } = require("./routers/orderRouter");
 // const { errorResponse } = require("./controllers/responseController");
+// const noteRouter = require("./routers/noteRouter");
 
 // require("./config/db");
 
-
-// // const limiter = rateLimit({
-// //   windowMs: 15 * 60 * 1000,
-// //   limit: 100,
-// //   message: "Too many reqeust from this ip please try later",
-// //   // standardHeaders: "draft-7",
-// //   // legacyHeaders: false,
-// // });
-
 // const app = express();
+// const server = http.createServer(app);
+// const io = new Server(server, { cors: { origin: "*" } });
 
+// // ✅ Attach `io` to the request object so controllers can access it
+// app.use((req, res, next) => {
+//   req.io = io;
+//   next();
+// });
+
+// // Middleware
 // app.use(cookieParser());
-// // app.use(limiter);
-// app.use(cors())
+// app.use(cors());
 // app.use(xssClean());
 // app.use(morgan("dev"));
 // app.use(bodyParser.json());
 // app.use(bodyParser.urlencoded({ extended: true }));
 
-
-// app.use("/api/seed", seedRouter);
-
-// app.use("/api", authRouter);
+// // Routes
 // app.use("/api", userRouter);
+// app.use("/api/notes", noteRouter);
 
 
 
+// // WebSocket connection
+// io.on("connection", (socket) => {
+//   console.log("A user connected");
+
+//   socket.on("updateNote", (data) => {
+//     io.emit("noteUpdated", data);
+//   });
+
+//   socket.on("disconnect", () => {
+//     console.log("A user disconnected");
+//   });
+// });
+
+// // Root Route
 // app.get("/", (req, res) => {
-//   return res.status(201).json({success: true, message:"welcome to the server"});
+//   return res.status(200).json({ success: true, message: "Welcome to the server" });
 // });
 
-
-// //client error handling
-
+// // Handle 404 errors
 // app.use((req, res, next) => {
-//   next(createError(404, "route not found"));
+//   next(createError(404, "Route not found"));
 // });
 
-// //server error handling
-
+// // Server error handling
 // app.use((err, req, res, next) => {
-//   return errorResponse(res, { statusCode: err.status, message: err.message });
+//   return errorResponse(res, { statusCode: err.status || 500, message: err.message || "Internal Server Error" });
 // });
 
-// module.exports = app;
+// // ✅ Export `server` for starting, and `io` for real-time updates
+// module.exports = { app, server };
+
 
 const express = require("express");
 const http = require("http");
@@ -79,29 +150,31 @@ require("./config/db");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
 
-// ✅ Attach `io` to the request object so controllers can access it
+// WebSocket Server (ONLY if NOT running on Vercel)
+const io = new Server(server, {
+  cors: { origin: "*" },
+});
+
+// ✅ Attach `io` to `req` so controllers can use it
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 
-// Middleware
-app.use(cookieParser());
+// ✅ Middleware
 app.use(cors());
 app.use(xssClean());
 app.use(morgan("dev"));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-// Routes
+// ✅ Routes
 app.use("/api", userRouter);
 app.use("/api/notes", noteRouter);
 
-
-
-// WebSocket connection
+// ✅ WebSocket Events
 io.on("connection", (socket) => {
   console.log("A user connected");
 
@@ -114,20 +187,23 @@ io.on("connection", (socket) => {
   });
 });
 
-// Root Route
+// ✅ Root Route
 app.get("/", (req, res) => {
-  return res.status(200).json({ success: true, message: "Welcome to the server" });
+  res.status(200).json({ success: true, message: "Welcome to the server" });
 });
 
-// Handle 404 errors
+// ✅ Handle 404 errors
 app.use((req, res, next) => {
   next(createError(404, "Route not found"));
 });
 
-// Server error handling
+// ✅ Global Error Handling
 app.use((err, req, res, next) => {
-  return errorResponse(res, { statusCode: err.status || 500, message: err.message || "Internal Server Error" });
+  errorResponse(res, {
+    statusCode: err.status || 500,
+    message: err.message || "Internal Server Error",
+  });
 });
 
-// ✅ Export `server` for starting, and `io` for real-time updates
-module.exports = { app, server };
+// ✅ Export `server` for starting, and `io` for WebSockets
+module.exports = { app, server, io };
