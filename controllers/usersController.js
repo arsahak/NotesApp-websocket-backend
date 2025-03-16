@@ -4,7 +4,7 @@ const User = require("../models/userModel");
 const { successResponse } = require("./responseController");
 const { findWithId } = require("../services/findWithId");
 const createJsonWebToken = require("../helper/jsonWebToken");
-const { jwtSecretKey, clientUrl } = require("../secret");
+const { jwtSecretKey, clientUrl, nodeEnv, accessToken, accessJwtSecretKey, refreshJwtSecretKey } = require("../secret");
 
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
@@ -123,36 +123,31 @@ const login = async (req, res, next) => {
       throw createError(404, "Email/Password did not match");
     }
 
-    if (user.isBanned) {
-      throw createError(403, "You are banned please contact with authority");
-    }
-
-    const accessToken = await createJsonWebToken({ user }, jwtSecretKey, {
-      expiresIn: "30d", 
+    const accessToken = await createJsonWebToken({ user }, accessJwtSecretKey, {
+      expiresIn: "7d", 
     });
     
     res.cookie("accessToken", accessToken, {
-      maxAge: 30 * 24 * 60 * 60 * 1000, 
+      maxAge: 7 * 24 * 60 * 60 * 1000, 
       httpOnly: true,
       sameSite: "none", 
     });
     
 
-    // const refreshToken = await createJsonWebToken({ user }, jwtSecretKey, {
-    //   expiresIn: "7d",
-    // });
-
-    // res.cookie("refreshToken", refreshToken, {
-    //   maxAge: 7 * 24 * 60 * 60 * 1000,
-    //   httpOnly: true,
-    //   // secure: true,
-    //   sameSite: "none",
-    // });
+    const refreshToken = await createJsonWebToken({ user }, refreshJwtSecretKey, {
+      expiresIn: "30d", 
+    });
+    
+    res.cookie("refreshToken", refreshToken, {
+      maxAge: 30 * 24 * 60 * 60 * 1000, 
+      httpOnly: true,
+      sameSite: "none", 
+    });
 
     return successResponse(res, {
       statusCode: 201,
       message: "User login successfully ",
-      payload: { user, accessToken  },
+      payload: { user, accessToken, refreshToken  },
     });
   } catch (error) {
     next(error);
@@ -161,23 +156,52 @@ const login = async (req, res, next) => {
 
 // Refresh Token
 const refreshToken = async (req, res, next) => {
-    try {
-        const { refreshToken } = req.cookies;
-        if (!refreshToken) throw createError(401, "Unauthorized");
+  try {
+    const { refreshToken } = req.body; // Extract refreshToken from request body
 
-        const user = await User.findOne({ refreshToken });
-        if (!user) throw createError(403, "Invalid refresh token");
-
-        jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
-            if (err) throw createError(403, "Invalid refresh token");
-
-            const newAccessToken = generateAccessToken(user);
-            return res.status(200).json({ accessToken: newAccessToken });
-        });
-    } catch (error) {
-        next(error);
+    if (!refreshToken) {
+      throw createError(401, "Refresh Token Missing. Please login again.");
     }
+
+
+    // Verify the refresh token
+    const decoded = jwt.verify(refreshToken, refreshJwtSecretKey);
+
+    if (!decoded || !decoded.user || !decoded.user._id) {
+      throw createError(401, "Invalid Refresh Token.");
+    }
+
+    // Check if user exists
+    const user = await User.findById(decoded.user._id);
+    if (!user) {
+      throw createError(401, "User not found.");
+    }
+
+    // Generate a new access token
+    const newAccessToken = await createJsonWebToken(
+      { user: { _id: user._id, email: user.email } },
+      accessJwtSecretKey,
+      { expiresIn: "7d" }
+    );
+
+    res.cookie("accessToken", newAccessToken, {
+      maxAge: 7 *24 * 60 *  60 *1000, // 1 minute
+      httpOnly: true,
+      secure: nodeEnv === "production", // Set secure in production
+      sameSite: "none",
+    });
+
+    return successResponse(res, {
+      statusCode: 200,
+      message: "Access token refreshed",
+      payload: { accessToken: newAccessToken },
+    });
+  } catch (error) {
+    console.error("Refresh token error:", error.message);
+    next(error);
+  }
 };
+
 
 // Logout User
 const logout = async (req, res, next) => {

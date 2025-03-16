@@ -7,6 +7,10 @@ const createNote = async (req, res, next) => {
   try {
     const { title, content } = req.body;
 
+
+    console.log('dfsdfdsf',  title, content);
+    
+
     if (!title || !content) {
       throw createError(400, "Title and content are required");
     }
