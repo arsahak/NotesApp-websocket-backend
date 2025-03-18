@@ -21,21 +21,6 @@ const generateRefreshToken = (user) => {
     return jwt.sign({ _id: user._id }, jwtSecretKey, { expiresIn: '7d' });
 };
 
-// User Registration
-// const register = async (req, res, next) => {
-//     try {
-//         const { name, email, password } = req.body;
-//         const existingUser = await User.findOne({ email });
-//         if (existingUser) throw createError(400, "Email already exists");
-
-//         const newUser = new User({ name, email, password });
-//         await newUser.save();
-
-//         return res.status(201).json({ message: "User registered successfully" });
-//     } catch (error) {
-//         next(error);
-//     }
-// };
 
 const register = async (req, res, next) => {
   try {

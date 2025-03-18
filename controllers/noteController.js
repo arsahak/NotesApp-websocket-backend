@@ -112,10 +112,10 @@ const updateNote = async (req, res, next) => {
       throw createError(401, "User not found.");
     }
 
-    const note = await Note.findById({_id: req.params.id}); 
+    const note = await Note.findById(req.params.id); // Fixed incorrect query
 
     if (!note) {
-   throw createError(401, "Note not found.");
+      throw createError(404, "Note not found.");
     }
 
     // Update note fields if provided
@@ -125,19 +125,15 @@ const updateNote = async (req, res, next) => {
     // Push edit history entry with both userId and userName
     note.editHistory.push({
       userId: req.user._id,
-      userName:  req.user.name,
+      userName: req.user.name,
       editedAt: new Date(),
     });
 
-    await note.save(); // Save changes
+    await note.save(); 
 
-    // Emit socket event for real-time updates (check if `req.io` exists)
+    // Emit socket event for real-time updates (send full updated note)
     if (req.io) {
-      req.io.emit("noteUpdated", {
-        _id: note._id,
-        title: note.title,
-        content: note.content,
-      });
+      req.io.emit("noteUpdated", note);
     }
 
     return res.status(200).json({
@@ -150,6 +146,7 @@ const updateNote = async (req, res, next) => {
   }
 };
 
+
 //deleeted
 const deleteNote = async (req, res, next) => {
   try {
@@ -161,7 +158,7 @@ const deleteNote = async (req, res, next) => {
     }
 
     // Find and delete note only if the author matches the logged-in user
-    const deletedNote = await Note.findOneAndDelete({ _id: id, author: req.user._id });
+    const deletedNote = await Note.findOneAndDelete({ _id: id });
 
     if (!deletedNote) {
       return next(createError(404, "Note not found or not authorized to delete"));
