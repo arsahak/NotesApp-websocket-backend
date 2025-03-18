@@ -179,7 +179,7 @@ const refreshToken = async (req, res, next) => {
 
     // Generate a new access token
     const newAccessToken = await createJsonWebToken(
-      { user: { _id: user._id, email: user.email } },
+      { user: { _id: user._id, email: user.email, name:user.name } },
       accessJwtSecretKey,
       { expiresIn: "7d" }
     );
